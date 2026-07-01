@@ -8,6 +8,7 @@ import 'package:deriv_chart/src/deriv_chart/chart/helpers/text_style_json_conver
 import 'package:deriv_chart/src/deriv_chart/interactive_layer/drawing_context.dart';
 import 'package:deriv_chart/src/deriv_chart/interactive_layer/helpers/types.dart';
 import 'package:deriv_chart/src/deriv_chart/interactive_layer/interactable_drawings/rectangle/rectangle_interactable_drawing.dart';
+import 'package:deriv_chart/src/theme/design_tokens/core_design_tokens.dart';
 import 'package:deriv_chart/src/theme/painting_styles/line_style.dart';
 import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -25,8 +26,12 @@ class RectangleDrawingToolConfig extends DrawingToolConfig {
     DrawingData? drawingData,
     List<EdgePoint> edgePoints = const <EdgePoint>[],
     this.fillStyle = const LineStyle(thickness: 0.9, color: Colors.blue),
-    this.lineStyle = const LineStyle(thickness: 0.9, color: Colors.white),
-    this.labelStyle = const TextStyle(color: Colors.blue, fontSize: 12),
+    this.lineStyle = const LineStyle(color: CoreDesignTokens.coreColorSolidBlue700),
+    this.labelStyle = const TextStyle(color: CoreDesignTokens.coreColorSolidBlue700,
+      fontSize: 12,
+      fontWeight: FontWeight.normal,
+      fontFamily: 'Inter',
+    ),
     this.pattern = DrawingPatterns.solid,
     super.number,
   }) : super(
