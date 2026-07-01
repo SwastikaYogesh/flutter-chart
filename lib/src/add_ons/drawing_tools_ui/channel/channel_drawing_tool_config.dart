@@ -4,6 +4,11 @@ import 'package:deriv_chart/src/add_ons/drawing_tools_ui/callbacks.dart';
 import 'package:deriv_chart/src/deriv_chart/chart/data_visualization/drawing_tools/data_model/drawing_pattern.dart';
 import 'package:deriv_chart/src/deriv_chart/chart/data_visualization/drawing_tools/data_model/edge_point.dart';
 import 'package:deriv_chart/src/deriv_chart/chart/data_visualization/drawing_tools/drawing_data.dart';
+import 'package:deriv_chart/src/deriv_chart/chart/helpers/text_style_json_converter.dart';
+import 'package:deriv_chart/src/deriv_chart/interactive_layer/drawing_context.dart';
+import 'package:deriv_chart/src/deriv_chart/interactive_layer/helpers/types.dart';
+import 'package:deriv_chart/src/deriv_chart/interactive_layer/interactable_drawings/channel/channel_interactable_drawing.dart';
+import 'package:deriv_chart/src/theme/design_tokens/core_design_tokens.dart';
 import 'package:deriv_chart/src/theme/painting_styles/line_style.dart';
 import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -20,7 +25,14 @@ class ChannelDrawingToolConfig extends DrawingToolConfig {
     DrawingData? drawingData,
     List<EdgePoint> edgePoints = const <EdgePoint>[],
     this.fillStyle = const LineStyle(thickness: 0.9, color: Colors.blue),
-    this.lineStyle = const LineStyle(thickness: 0.9, color: Colors.white),
+    this.lineStyle =
+        const LineStyle(color: CoreDesignTokens.coreColorSolidBlue700),
+    this.labelStyle = const TextStyle(
+      color: CoreDesignTokens.coreColorSolidBlue700,
+      fontSize: 12,
+      fontWeight: FontWeight.normal,
+      fontFamily: 'Inter',
+    ),
     this.pattern = DrawingPatterns.solid,
     super.number,
   }) : super(
@@ -46,6 +58,10 @@ class ChannelDrawingToolConfig extends DrawingToolConfig {
   /// Drawing tool fill style
   final LineStyle fillStyle;
 
+  /// The style of the labels showing on the axes when the tool is selected.
+  @TextStyleJsonConverter()
+  final TextStyle labelStyle;
+
   /// Drawing tool line pattern: 'solid', 'dotted', 'dashed'
   // TODO(maryia-binary): implement 'dotted' and 'dashed' patterns
   final DrawingPatterns pattern;
@@ -67,6 +83,7 @@ class ChannelDrawingToolConfig extends DrawingToolConfig {
     DrawingData? drawingData,
     LineStyle? lineStyle,
     LineStyle? fillStyle,
+    TextStyle? labelStyle,
     DrawingPatterns? pattern,
     List<EdgePoint>? edgePoints,
     bool? enableLabel,
@@ -77,8 +94,30 @@ class ChannelDrawingToolConfig extends DrawingToolConfig {
         drawingData: drawingData ?? this.drawingData,
         lineStyle: lineStyle ?? this.lineStyle,
         fillStyle: fillStyle ?? this.fillStyle,
+        labelStyle: labelStyle ?? this.labelStyle,
         pattern: pattern ?? this.pattern,
         edgePoints: edgePoints ?? this.edgePoints,
         number: number ?? this.number,
       );
+
+  @override
+  ChannelInteractableDrawing getInteractableDrawing(
+    DrawingContext drawingContext,
+    GetDrawingState getDrawingState,
+  ) {
+    final EdgePoint? startPoint =
+        edgePoints.isNotEmpty ? edgePoints.first : null;
+    final EdgePoint? middlePoint =
+        edgePoints.length > 1 ? edgePoints[1] : null;
+    final EdgePoint? endPoint = edgePoints.length > 2 ? edgePoints[2] : null;
+
+    return ChannelInteractableDrawing(
+      config: this,
+      startPoint: startPoint,
+      middlePoint: middlePoint,
+      endPoint: endPoint,
+      drawingContext: drawingContext,
+      getDrawingState: getDrawingState,
+    );
+  }
 }
