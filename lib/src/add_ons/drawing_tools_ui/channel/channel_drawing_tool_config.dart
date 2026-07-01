@@ -107,9 +107,14 @@ class ChannelDrawingToolConfig extends DrawingToolConfig {
   ) {
     final EdgePoint? startPoint =
         edgePoints.isNotEmpty ? edgePoints.first : null;
-    final EdgePoint? middlePoint =
-        edgePoints.length > 1 ? edgePoints[1] : null;
-    final EdgePoint? endPoint = edgePoints.length > 2 ? edgePoints[2] : null;
+    final EdgePoint? middlePoint = edgePoints.length > 1 ? edgePoints[1] : null;
+    EdgePoint? endPoint = edgePoints.length > 2 ? edgePoints[2] : null;
+
+    // Keep the right rail vertical: the top-right point shares the middle
+    // point's timestamp.
+    if (middlePoint != null && endPoint != null) {
+      endPoint = EdgePoint(epoch: middlePoint.epoch, quote: endPoint.quote);
+    }
 
     return ChannelInteractableDrawing(
       config: this,

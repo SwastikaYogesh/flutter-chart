@@ -87,8 +87,10 @@ abstract class ChannelAddingPreview
       );
       onAddingStateChange(AddingStateInfo(2, 3));
     } else if (drawing.endPoint == null) {
+      // Keep the right rail vertical: the top-right point shares the
+      // bottom-right (middle) point's timestamp.
       drawing.endPoint = EdgePoint(
-        epoch: epochFromX(details.localPosition.dx),
+        epoch: drawing.middlePoint!.epoch,
         quote: quoteFromY(details.localPosition.dy),
       );
       onAddingStateChange(AddingStateInfo(3, 3));

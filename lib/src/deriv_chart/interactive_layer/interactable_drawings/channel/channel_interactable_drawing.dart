@@ -45,8 +45,10 @@ enum _ChannelEdge {
 /// - The **left rail** is bottom-left ([startPoint]) + top-left (derived).
 /// - The **right rail** is bottom-right ([middlePoint]) + top-right ([endPoint]).
 ///
-/// Dragging any corner translates the whole rail it belongs to, keeping the two
-/// lines parallel and the channel width fixed.
+/// Each rail is vertical: both of its corners share the same timestamp (so
+/// [endPoint] always keeps [middlePoint]'s epoch). Dragging any corner
+/// translates the whole rail it belongs to, keeping the two lines parallel and
+/// the channel width fixed.
 class ChannelInteractableDrawing
     extends InteractableDrawing<ChannelDrawingToolConfig> {
   /// Initializes [ChannelInteractableDrawing].
