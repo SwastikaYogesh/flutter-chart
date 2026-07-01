@@ -121,3 +121,4 @@ cline_instructions.md
 
 # Generated Dart files
 *.g.dart
+.dart_tool/
