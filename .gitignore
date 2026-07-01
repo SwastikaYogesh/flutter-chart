@@ -31,7 +31,6 @@ out/
 
 # Gradle files
 .gradle/
-build/
 
 # Local configuration file (sdk path, etc)
 local.properties
@@ -121,4 +120,3 @@ cline_instructions.md
 
 # Generated Dart files
 *.g.dart
-.dart_tool/
