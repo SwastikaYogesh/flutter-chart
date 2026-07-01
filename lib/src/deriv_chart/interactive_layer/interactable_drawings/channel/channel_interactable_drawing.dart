@@ -25,14 +25,22 @@ import '../interactable_drawing.dart';
 import 'channel_adding_preview_desktop.dart';
 import 'channel_adding_preview_mobile.dart';
 
-/// Which vertical side (rail) of the channel is currently being dragged.
-enum _ChannelEdge {
+/// Which handle of the channel is currently being dragged.
+enum _ChannelHandle {
   /// The left rail: bottom-left ([startPoint]) and top-left (derived) corners.
-  left,
+  leftRail,
 
   /// The right rail: bottom-right ([middlePoint]) and top-right ([endPoint])
   /// corners.
-  right,
+  rightRail,
+
+  /// The derived midpoint of the top line. Dragging it moves both top corners
+  /// vertically to adjust the channel width.
+  topCenter,
+
+  /// The derived midpoint of the bottom line. Dragging it moves both bottom
+  /// corners vertically to adjust the channel width.
+  bottomCenter,
 }
 
 /// Interactable drawing implementation for the channel drawing tool.
@@ -49,6 +57,10 @@ enum _ChannelEdge {
 /// [endPoint] always keeps [middlePoint]'s epoch). Dragging any corner
 /// translates the whole rail it belongs to, keeping the two lines parallel and
 /// the channel width fixed.
+///
+/// Two derived midpoint handles (top-line center and bottom-line center) let the
+/// user set the channel width: dragging one moves both corners of that line
+/// vertically, keeping the lines parallel and the rails vertical.
 class ChannelInteractableDrawing
     extends InteractableDrawing<ChannelDrawingToolConfig> {
   /// Initializes [ChannelInteractableDrawing].
@@ -70,8 +82,8 @@ class ChannelInteractableDrawing
   /// Top-right point the parallel line passes through (right rail, top).
   EdgePoint? endPoint;
 
-  /// Which rail is being dragged, or `null` when dragging the whole channel.
-  _ChannelEdge? _draggedEdge;
+  /// Which handle is being dragged, or `null` when dragging the whole channel.
+  _ChannelHandle? _draggedHandle;
 
   /// Computes the four parallelogram corners in screen space.
   ///
@@ -99,6 +111,14 @@ class ChannelInteractableDrawing
     ..lineTo(corners[3].dx, corners[3].dy)
     ..close();
 
+  /// Returns the derived midpoint handles `[topCenter, bottomCenter]` from the
+  /// parallelogram [corners] (`[bottomLeft, bottomRight, topRight, topLeft]`).
+  static List<Offset> lineCenters(List<Offset> corners) {
+    final Offset topCenter = (corners[3] + corners[2]) / 2;
+    final Offset bottomCenter = (corners[0] + corners[1]) / 2;
+    return <Offset>[topCenter, bottomCenter];
+  }
+
   bool get _hasAllPoints =>
       startPoint != null && middlePoint != null && endPoint != null;
 
@@ -120,20 +140,28 @@ class ChannelInteractableDrawing
     final Offset startOffset = _toOffset(startPoint!, epochToX, quoteToY);
     final Offset middleOffset = _toOffset(middlePoint!, epochToX, quoteToY);
     final Offset endOffset = _toOffset(endPoint!, epochToX, quoteToY);
-    final Offset topLeftOffset =
-        parallelogramCorners(startOffset, middleOffset, endOffset)[3];
+    final List<Offset> corners =
+        parallelogramCorners(startOffset, middleOffset, endOffset);
+    final Offset topLeftOffset = corners[3];
+    final List<Offset> centers = lineCenters(corners);
+    final Offset topCenter = centers[0];
+    final Offset bottomCenter = centers[1];
 
     final Offset position = details.localPosition;
 
-    if ((position - startOffset).distance <= hitTestMargin ||
-        (position - topLeftOffset).distance <= hitTestMargin) {
-      _draggedEdge = _ChannelEdge.left;
-    } else if ((position - middleOffset).distance <= hitTestMargin ||
-        (position - endOffset).distance <= hitTestMargin) {
-      _draggedEdge = _ChannelEdge.right;
+    bool near(Offset target) => (position - target).distance <= hitTestMargin;
+
+    if (near(startOffset) || near(topLeftOffset)) {
+      _draggedHandle = _ChannelHandle.leftRail;
+    } else if (near(middleOffset) || near(endOffset)) {
+      _draggedHandle = _ChannelHandle.rightRail;
+    } else if (near(topCenter)) {
+      _draggedHandle = _ChannelHandle.topCenter;
+    } else if (near(bottomCenter)) {
+      _draggedHandle = _ChannelHandle.bottomCenter;
     } else {
       // Dragging the whole channel.
-      _draggedEdge = null;
+      _draggedHandle = null;
     }
   }
 
@@ -190,14 +218,29 @@ class ChannelInteractableDrawing
     final Offset topRight = corners[2];
     final Offset topLeft = corners[3];
 
-    // Corner groups per rail.
+    // Corner groups per rail and the derived width handles.
     final List<Offset> leftRail = <Offset>[bottomLeft, topLeft];
     final List<Offset> rightRail = <Offset>[bottomRight, topRight];
+    final List<Offset> centers = lineCenters(corners);
 
-    // Neon glow first (unless dragging a single rail), then crisp lines.
+    // The offsets highlighted (glow + alignment guides) for a given handle.
+    List<Offset> handleTargets(_ChannelHandle handle) {
+      switch (handle) {
+        case _ChannelHandle.leftRail:
+          return leftRail;
+        case _ChannelHandle.rightRail:
+          return rightRail;
+        case _ChannelHandle.topCenter:
+          return <Offset>[centers[0]];
+        case _ChannelHandle.bottomCenter:
+          return <Offset>[centers[1]];
+      }
+    }
+
+    // Neon glow first (unless dragging a single handle), then crisp lines.
     if (drawingState.contains(DrawingToolState.selected) &&
         !(drawingState.contains(DrawingToolState.dragging) &&
-            _draggedEdge != null)) {
+            _draggedHandle != null)) {
       final Paint neonPaint = Paint()
         ..color = lineStyle.color.withOpacity(0.4)
         ..strokeWidth = 8 * animationInfo.stateChangePercent
@@ -224,23 +267,22 @@ class ChannelInteractableDrawing
     if (drawingState.contains(DrawingToolState.selected) ||
         drawingState.contains(DrawingToolState.hovered) ||
         drawingState.contains(DrawingToolState.dragging)) {
-      for (final Offset corner in corners) {
+      // Corner handles and the two derived width handles.
+      for (final Offset handle in <Offset>[...corners, ...centers]) {
         drawPointOffset(
-            corner, epochToX, quoteToY, canvas, paintStyle, lineStyle,
+            handle, epochToX, quoteToY, canvas, paintStyle, lineStyle,
             radius: 4);
       }
 
       if (drawingState.contains(DrawingToolState.dragging) &&
-          _draggedEdge != null) {
-        // Glow both corners of the rail being dragged.
-        final List<Offset> rail =
-            _draggedEdge == _ChannelEdge.left ? leftRail : rightRail;
-        for (final Offset corner in rail) {
+          _draggedHandle != null) {
+        // Glow the handle(s) being dragged.
+        for (final Offset target in handleTargets(_draggedHandle!)) {
           drawFocusedCircle(
             paintStyle,
             lineStyle,
             canvas,
-            corner,
+            target,
             10 * animationInfo.stateChangePercent,
             3 * animationInfo.stateChangePercent,
           );
@@ -253,20 +295,19 @@ class ChannelInteractableDrawing
             selected ? 10 * animationInfo.stateChangePercent : 10;
         final double inner =
             selected ? 3 * animationInfo.stateChangePercent : 3;
-        for (final Offset corner in corners) {
+        for (final Offset handle in <Offset>[...corners, ...centers]) {
           drawFocusedCircle(
-              paintStyle, lineStyle, canvas, corner, outer, inner);
+              paintStyle, lineStyle, canvas, handle, outer, inner);
         }
       }
     }
 
     // Alignment guides while dragging.
     if (drawingState.contains(DrawingToolState.dragging)) {
-      final List<Offset> guided = _draggedEdge == null
-          ? corners
-          : (_draggedEdge == _ChannelEdge.left ? leftRail : rightRail);
-      for (final Offset corner in guided) {
-        drawPointAlignmentGuides(canvas, size, corner,
+      final List<Offset> guided =
+          _draggedHandle == null ? corners : handleTargets(_draggedHandle!);
+      for (final Offset target in guided) {
+        drawPointAlignmentGuides(canvas, size, target,
             lineColor: lineStyle.color);
       }
     }
@@ -361,17 +402,36 @@ class ChannelInteractableDrawing
       );
     }
 
-    switch (_draggedEdge) {
-      case _ChannelEdge.left:
+    // Moves a point vertically only, preserving its timestamp (used by the
+    // width handles so the rails stay vertical).
+    EdgePoint verticallyMovedPoint(Offset current, EdgePoint point) =>
+        EdgePoint(
+          epoch: point.epoch,
+          quote: quoteFromY(current.dy + delta.dy),
+        );
+
+    switch (_draggedHandle) {
+      case _ChannelHandle.leftRail:
         // Move the left rail: shifting `start` also shifts the derived top-left
         // corner, so both left corners translate together.
         startPoint = movedPoint(startOffset);
         break;
-      case _ChannelEdge.right:
+      case _ChannelHandle.rightRail:
         // Move the right rail: shift both bottom-right and top-right together,
         // which keeps the derived top-left (and the width) unchanged.
         middlePoint = movedPoint(middleOffset);
         endPoint = movedPoint(endOffset);
+        break;
+      case _ChannelHandle.topCenter:
+        // Adjust width from the top: move both top corners vertically. Shifting
+        // `end` vertically also shifts the derived top-left corner.
+        endPoint = verticallyMovedPoint(endOffset, endPoint!);
+        break;
+      case _ChannelHandle.bottomCenter:
+        // Adjust width from the bottom: move both bottom corners vertically. The
+        // derived top-left stays put since start and middle shift equally.
+        startPoint = verticallyMovedPoint(startOffset, startPoint!);
+        middlePoint = verticallyMovedPoint(middleOffset, middlePoint!);
         break;
       case null:
         // Move the whole channel.
@@ -390,7 +450,7 @@ class ChannelInteractableDrawing
     EpochToX epochToX,
     QuoteToY quoteToY,
   ) {
-    _draggedEdge = null;
+    _draggedHandle = null;
   }
 
   @override
