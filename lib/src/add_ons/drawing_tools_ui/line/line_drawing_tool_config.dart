@@ -60,6 +60,7 @@ class LineDrawingToolConfig extends DrawingToolConfig {
   final TextStyle labelStyle;
 
   /// Drawing tool overlay style
+  @JsonKey(includeFromJson: false, includeToJson: false)
   final OverlayStyle? overlayStyle;
 
   /// Drawing tool line pattern: 'solid', 'dotted', 'dashed'

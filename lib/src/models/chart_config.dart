@@ -36,6 +36,7 @@ class ChartConfig {
   final bool snapMarkersToIntervals;
 
   /// Chart Axis configuration.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   final ChartAxisConfig chartAxisConfig;
 
   @override
