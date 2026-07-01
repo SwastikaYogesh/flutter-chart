@@ -142,27 +142,35 @@ class ChannelInteractableDrawing
     final Offset endOffset = _toOffset(endPoint!, epochToX, quoteToY);
     final List<Offset> corners =
         parallelogramCorners(startOffset, middleOffset, endOffset);
-    final Offset topLeftOffset = corners[3];
     final List<Offset> centers = lineCenters(corners);
-    final Offset topCenter = centers[0];
-    final Offset bottomCenter = centers[1];
 
+    // Which screen offsets activate each handle. Insertion order gives corners
+    // precedence over the line-center handles when distances tie.
+    final Map<_ChannelHandle, List<Offset>> handleOffsets =
+        <_ChannelHandle, List<Offset>>{
+      _ChannelHandle.leftRail: <Offset>[corners[0], corners[3]],
+      _ChannelHandle.rightRail: <Offset>[corners[1], corners[2]],
+      _ChannelHandle.topCenter: <Offset>[centers[0]],
+      _ChannelHandle.bottomCenter: <Offset>[centers[1]],
+    };
+
+    // Grab the nearest handle within [hitTestMargin]; otherwise drag the whole
+    // channel. Picking the nearest (rather than first match) keeps the two
+    // line-center handles distinct even on a narrow channel.
     final Offset position = details.localPosition;
+    _ChannelHandle? nearest;
+    double bestDistance = double.infinity;
+    handleOffsets.forEach((_ChannelHandle handle, List<Offset> offsets) {
+      for (final Offset o in offsets) {
+        final double distance = (position - o).distance;
+        if (distance <= hitTestMargin && distance < bestDistance) {
+          bestDistance = distance;
+          nearest = handle;
+        }
+      }
+    });
 
-    bool near(Offset target) => (position - target).distance <= hitTestMargin;
-
-    if (near(startOffset) || near(topLeftOffset)) {
-      _draggedHandle = _ChannelHandle.leftRail;
-    } else if (near(middleOffset) || near(endOffset)) {
-      _draggedHandle = _ChannelHandle.rightRail;
-    } else if (near(topCenter)) {
-      _draggedHandle = _ChannelHandle.topCenter;
-    } else if (near(bottomCenter)) {
-      _draggedHandle = _ChannelHandle.bottomCenter;
-    } else {
-      // Dragging the whole channel.
-      _draggedHandle = null;
-    }
+    _draggedHandle = nearest;
   }
 
   @override
@@ -178,8 +186,11 @@ class ChannelInteractableDrawing
     final List<Offset> corners =
         parallelogramCorners(startOffset, middleOffset, endOffset);
 
-    for (final Offset corner in corners) {
-      if ((offset - corner).distance <= hitTestMargin) {
+    // The 4 corner handles and the 2 derived line-center (width) handles. The
+    // centers sit on the parallelogram's edges, where [Path.contains] is
+    // unreliable, so they must be hit-tested explicitly.
+    for (final Offset handle in <Offset>[...corners, ...lineCenters(corners)]) {
+      if ((offset - handle).distance <= hitTestMargin) {
         return true;
       }
     }
