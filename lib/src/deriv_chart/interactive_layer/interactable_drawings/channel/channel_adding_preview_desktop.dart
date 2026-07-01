@@ -84,9 +84,9 @@ class ChannelAddingPreviewDesktop extends ChannelAddingPreview {
 
     final middleOffset = edgePointToOffset(middlePoint, epochToX, quoteToY);
 
-    // Base line is fixed; preview the channel width following the pointer.
+    // Base line is fixed; preview the parallel line following the pointer.
     if (_hoverPosition != null) {
-      drawChannelPreview(canvas, startOffset, middleOffset, _hoverPosition!.dy,
+      drawChannelPreview(canvas, startOffset, middleOffset, _hoverPosition!,
           paintStyle, lineStyle, fillStyle);
       drawPointAlignmentGuides(canvas, size, _hoverPosition!,
           lineColor: lineStyle.color);

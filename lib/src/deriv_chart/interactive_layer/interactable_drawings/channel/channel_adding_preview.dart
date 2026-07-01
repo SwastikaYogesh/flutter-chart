@@ -38,18 +38,18 @@ abstract class ChannelAddingPreview
       Offset(epochToX(point.epoch), quoteToY(point.quote));
 
   /// Draws the channel's parallelogram (fill + the two parallel lines) with the
-  /// offset side passing through [offsetY] under [middle].
+  /// parallel line passing through the [end] point.
   void drawChannelPreview(
     Canvas canvas,
     Offset start,
     Offset middle,
-    double offsetY,
+    Offset end,
     DrawingPaintStyle paintStyle,
     LineStyle lineStyle,
     LineStyle fillStyle,
   ) {
     final List<Offset> corners =
-        ChannelInteractableDrawing.parallelogramCorners(start, middle, offsetY);
+        ChannelInteractableDrawing.parallelogramCorners(start, middle, end);
 
     canvas.drawPath(
       ChannelInteractableDrawing.parallelogramPath(corners),
@@ -88,7 +88,7 @@ abstract class ChannelAddingPreview
       onAddingStateChange(AddingStateInfo(2, 3));
     } else if (drawing.endPoint == null) {
       drawing.endPoint = EdgePoint(
-        epoch: drawing.middlePoint!.epoch,
+        epoch: epochFromX(details.localPosition.dx),
         quote: quoteFromY(details.localPosition.dy),
       );
       onAddingStateChange(AddingStateInfo(3, 3));
