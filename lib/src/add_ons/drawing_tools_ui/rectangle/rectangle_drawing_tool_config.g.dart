@@ -23,6 +23,10 @@ RectangleDrawingToolConfig _$RectangleDrawingToolConfigFromJson(
       lineStyle: json['lineStyle'] == null
           ? const LineStyle(thickness: 0.9, color: Colors.white)
           : LineStyle.fromJson(json['lineStyle'] as Map<String, dynamic>),
+      labelStyle: json['labelStyle'] == null
+          ? const TextStyle(color: Colors.blue, fontSize: 12)
+          : const TextStyleJsonConverter()
+              .fromJson(json['labelStyle'] as Map<String, dynamic>),
       pattern: $enumDecodeNullable(_$DrawingPatternsEnumMap, json['pattern']) ??
           DrawingPatterns.solid,
       number: (json['number'] as num?)?.toInt() ?? 0,
@@ -31,12 +35,13 @@ RectangleDrawingToolConfig _$RectangleDrawingToolConfigFromJson(
 Map<String, dynamic> _$RectangleDrawingToolConfigToJson(
         RectangleDrawingToolConfig instance) =>
     <String, dynamic>{
+      'configId': instance.configId,
       'number': instance.number,
       'drawingData': instance.drawingData,
       'edgePoints': instance.edgePoints,
-      'configId': instance.configId,
       'lineStyle': instance.lineStyle,
       'fillStyle': instance.fillStyle,
+      'labelStyle': const TextStyleJsonConverter().toJson(instance.labelStyle),
       'pattern': _$DrawingPatternsEnumMap[instance.pattern]!,
     };
 
