@@ -546,6 +546,7 @@ class FibfanInteractableDrawing
           currentColor: config.lineStyle.color,
           onColorChanged: (newColor) => onUpdate(config.copyWith(
             lineStyle: config.lineStyle.copyWith(color: newColor),
+            fillStyle: config.fillStyle.copyWith(color: newColor),
             labelStyle: config.labelStyle.copyWith(color: newColor),
           )),
         ),
