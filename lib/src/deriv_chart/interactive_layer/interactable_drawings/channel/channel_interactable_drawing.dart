@@ -85,6 +85,12 @@ class ChannelInteractableDrawing
   /// Which handle is being dragged, or `null` when dragging the whole channel.
   _ChannelHandle? _draggedHandle;
 
+  /// Index into the parallelogram corners (0=bottom-left, 1=bottom-right,
+  /// 2=top-right, 3=top-left) of the specific rail corner grabbed. `null` when
+  /// dragging a center handle or the whole channel. Used so alignment guides
+  /// follow only the grabbed corner, not the corner that moves with it.
+  int? _draggedCornerIndex;
+
   /// Computes the four parallelogram corners in screen space.
   ///
   /// The channel is a parallelogram whose base line is [start] -> [middle] and
@@ -171,6 +177,23 @@ class ChannelInteractableDrawing
     });
 
     _draggedHandle = nearest;
+
+    // For a rail, remember which of its two corners the user actually grabbed
+    // so the alignment guides follow only that corner. Cleared for the center
+    // handles and whole-channel drags.
+    if (nearest == _ChannelHandle.leftRail) {
+      _draggedCornerIndex =
+          (position - corners[0]).distance <= (position - corners[3]).distance
+              ? 0
+              : 3;
+    } else if (nearest == _ChannelHandle.rightRail) {
+      _draggedCornerIndex =
+          (position - corners[1]).distance <= (position - corners[2]).distance
+              ? 1
+              : 2;
+    } else {
+      _draggedCornerIndex = null;
+    }
   }
 
   @override
@@ -313,14 +336,13 @@ class ChannelInteractableDrawing
       }
     }
 
-    // Alignment guides while dragging.
-    if (drawingState.contains(DrawingToolState.dragging)) {
-      final List<Offset> guided =
-          _draggedHandle == null ? corners : handleTargets(_draggedHandle!);
-      for (final Offset target in guided) {
-        drawPointAlignmentGuides(canvas, size, target,
-            lineColor: lineStyle.color);
-      }
+    // Alignment guides are shown only for a corner point that is being
+    // dragged directly. A rail's partner corner that just moves along, the
+    // width (edge-midpoint) handles, and whole-channel drags show none.
+    if (drawingState.contains(DrawingToolState.dragging) &&
+        _draggedCornerIndex != null) {
+      drawPointAlignmentGuides(canvas, size, corners[_draggedCornerIndex!],
+          lineColor: lineStyle.color);
     }
   }
 
@@ -344,18 +366,23 @@ class ChannelInteractableDrawing
 
     final double progress = animationInfo.stateChangePercent;
 
-    // Value labels (Y-axis) for the three distinct quote levels.
+    // Value labels (Y-axis) for the four corner quote levels. The fourth
+    // (top-left) corner is derived to keep the sides parallel, so its price is
+    // `start + end - middle` (matching `topLeft = start + (end - middle)`).
+    final double derivedCornerQuote =
+        startPoint!.quote + endPoint!.quote - middlePoint!.quote;
     final Set<double> seenQuotes = <double>{};
-    for (final EdgePoint point in <EdgePoint>[
-      startPoint!,
-      middlePoint!,
-      endPoint!
+    for (final double quote in <double>[
+      startPoint!.quote,
+      middlePoint!.quote,
+      endPoint!.quote,
+      derivedCornerQuote,
     ]) {
-      if (seenQuotes.add(point.quote)) {
+      if (seenQuotes.add(quote)) {
         drawValueLabel(
           canvas: canvas,
           quoteToY: quoteToY,
-          value: point.quote,
+          value: quote,
           pipSize: chartConfig.pipSize,
           animationProgress: progress,
           size: size,
@@ -462,6 +489,7 @@ class ChannelInteractableDrawing
     QuoteToY quoteToY,
   ) {
     _draggedHandle = null;
+    _draggedCornerIndex = null;
   }
 
   @override
