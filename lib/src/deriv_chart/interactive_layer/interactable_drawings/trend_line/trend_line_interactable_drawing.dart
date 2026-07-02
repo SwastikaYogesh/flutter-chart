@@ -387,6 +387,36 @@ class TrendLineInteractableDrawing
     GetDrawingState getDrawingState,
   ) {
     if (getDrawingState(this).contains(DrawingToolState.selected)) {
+      // Two points whose prices round to the same displayed value share a
+      // single label instead of stacking two identical ones.
+      final bool samePriceLabel = startPoint != null &&
+          endPoint != null &&
+          startPoint!.quote.toStringAsFixed(chartConfig.pipSize) ==
+              endPoint!.quote.toStringAsFixed(chartConfig.pipSize);
+
+      // When the two prices are so close their label boxes would overlap, push
+      // ONLY the moving point's label to the adjacent slot and keep the other
+      // anchored to its price — so dragging one point never shoves the other's
+      // label. The dashed alignment guides in paint() keep pointing at the true
+      // prices; only these Y-axis boxes shift.
+      double? startLabelY;
+      double? endLabelY;
+      if (startPoint != null && endPoint != null && !samePriceLabel) {
+        final double startY = quoteToY(startPoint!.quote);
+        final double endY = quoteToY(endPoint!.quote);
+        const double minGap = 24; // Label box height.
+        if ((startY - endY).abs() < minGap) {
+          // The dragged point's label moves; the stationary point's stays put.
+          // When no single point is being dragged (static selection or whole-
+          // line drag) the start label stays anchored and the end label moves.
+          if (isDraggingStartPoint ?? false) {
+            startLabelY = endY + (startY <= endY ? -minGap : minGap);
+          } else {
+            endLabelY = startY + (endY <= startY ? -minGap : minGap);
+          }
+        }
+      }
+
       // Draw value label for start point
       if (startPoint != null) {
         drawValueLabel(
@@ -399,13 +429,13 @@ class TrendLineInteractableDrawing
           textStyle: config.labelStyle,
           color: config.lineStyle.color,
           backgroundColor: chartTheme.backgroundColor,
+          yPositionOverride: startLabelY,
         );
       }
 
-      // Draw value label for end point (offset slightly to avoid overlap)
-      if (endPoint != null &&
-          startPoint != null &&
-          endPoint!.quote != startPoint!.quote) {
+      // Draw the end point's label unless it shows the same price as the start
+      // label, in which case a single shared label is shown.
+      if (endPoint != null && startPoint != null && !samePriceLabel) {
         drawValueLabel(
           canvas: canvas,
           quoteToY: quoteToY,
@@ -416,6 +446,7 @@ class TrendLineInteractableDrawing
           textStyle: config.labelStyle,
           color: config.lineStyle.color,
           backgroundColor: chartTheme.backgroundColor,
+          yPositionOverride: endLabelY,
         );
       }
     }

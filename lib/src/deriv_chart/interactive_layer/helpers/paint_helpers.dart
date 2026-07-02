@@ -191,9 +191,13 @@ void drawValueLabel({
   double neonOpacity = 0.4,
   double neonStrokeWidth = 8,
   double neonBlurRadius = 6,
+  double? yPositionOverride,
 }) {
-  // Calculate Y position based on the value
-  final double yPosition = quoteToY(value);
+  // Calculate Y position based on the value. Callers can pass
+  // [yPositionOverride] to shift the label box (e.g. to stop two labels with
+  // near-equal prices from overlapping) while the value text still reflects the
+  // real price.
+  final double yPosition = yPositionOverride ?? quoteToY(value);
 
   // Format the value according to pip size with proper decimal places
   final String formattedValue = value.toStringAsFixed(pipSize);
