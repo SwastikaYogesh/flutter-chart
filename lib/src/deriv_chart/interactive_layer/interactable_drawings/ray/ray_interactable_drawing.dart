@@ -286,7 +286,17 @@ class RayInteractableDrawing extends InteractableDrawing<RayDrawingToolConfig> {
       return;
     }
 
-    // Value labels (Y-axis) for both defining points.
+    // Value labels (Y-axis) for both defining points. Equal displayed prices
+    // collapse to one label; near-equal ones don't overlap, moving only the
+    // dragged point's box.
+    final ValueLabelPairLayout labelLayout = layoutValueLabelPair(
+      firstQuote: startPoint!.quote,
+      secondQuote: endPoint!.quote,
+      quoteToY: quoteToY,
+      pipSize: chartConfig.pipSize,
+      isDraggingFirst: isDraggingStartPoint,
+    );
+
     drawValueLabel(
       canvas: canvas,
       quoteToY: quoteToY,
@@ -297,9 +307,10 @@ class RayInteractableDrawing extends InteractableDrawing<RayDrawingToolConfig> {
       textStyle: config.labelStyle,
       color: config.lineStyle.color,
       backgroundColor: chartTheme.backgroundColor,
+      yPositionOverride: labelLayout.firstYOverride,
     );
 
-    if (endPoint!.quote != startPoint!.quote) {
+    if (labelLayout.showSecond) {
       drawValueLabel(
         canvas: canvas,
         quoteToY: quoteToY,
@@ -310,6 +321,7 @@ class RayInteractableDrawing extends InteractableDrawing<RayDrawingToolConfig> {
         textStyle: config.labelStyle,
         color: config.lineStyle.color,
         backgroundColor: chartTheme.backgroundColor,
+        yPositionOverride: labelLayout.secondYOverride,
       );
     }
 
