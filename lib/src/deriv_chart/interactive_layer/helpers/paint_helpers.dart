@@ -172,6 +172,75 @@ class CircularIntervalList<T> {
   }
 }
 
+/// Layout for a pair of Y-axis price labels that must not overlap.
+///
+/// Produced by [layoutValueLabelPair].
+class ValueLabelPairLayout {
+  /// Creates a [ValueLabelPairLayout].
+  const ValueLabelPairLayout({
+    required this.showSecond,
+    this.firstYOverride,
+    this.secondYOverride,
+  });
+
+  /// Y position to draw the first label's box at, or `null` to use its true
+  /// price. Pass to [drawValueLabel]'s `yPositionOverride`.
+  final double? firstYOverride;
+
+  /// Y position to draw the second label's box at, or `null` to use its true
+  /// price. Pass to [drawValueLabel]'s `yPositionOverride`.
+  final double? secondYOverride;
+
+  /// Whether the second label should be drawn. `false` when both prices format
+  /// to the same displayed value, so a single shared label is shown.
+  final bool showSecond;
+}
+
+/// Computes non-overlapping positions for two Y-axis price labels.
+///
+/// * If [firstQuote] and [secondQuote] format to the same displayed value (at
+///   [pipSize] decimals) only one label is shown ([ValueLabelPairLayout.showSecond]
+///   is `false`).
+/// * Otherwise, if the two label boxes would overlap (their centres are closer
+///   than [minGap]), only the label of the point currently being dragged is
+///   pushed to the adjacent slot while the other stays anchored to its price,
+///   so a drag never shoves the stationary label. [isDraggingFirst] is `true`
+///   when the first point is being dragged, `false` for the second, and `null`
+///   when neither is (static selection or whole-shape drag) — in which case the
+///   first label stays anchored and the second one moves.
+ValueLabelPairLayout layoutValueLabelPair({
+  required double firstQuote,
+  required double secondQuote,
+  required QuoteToY quoteToY,
+  required int pipSize,
+  required bool? isDraggingFirst,
+  double minGap = 24,
+}) {
+  if (firstQuote.toStringAsFixed(pipSize) ==
+      secondQuote.toStringAsFixed(pipSize)) {
+    return const ValueLabelPairLayout(showSecond: false);
+  }
+
+  final double firstY = quoteToY(firstQuote);
+  final double secondY = quoteToY(secondQuote);
+
+  double? firstYOverride;
+  double? secondYOverride;
+  if ((firstY - secondY).abs() < minGap) {
+    if (isDraggingFirst ?? false) {
+      firstYOverride = secondY + (firstY <= secondY ? -minGap : minGap);
+    } else {
+      secondYOverride = firstY + (secondY <= firstY ? -minGap : minGap);
+    }
+  }
+
+  return ValueLabelPairLayout(
+    showSecond: true,
+    firstYOverride: firstYOverride,
+    secondYOverride: secondYOverride,
+  );
+}
+
 /// Draws a value rectangle with formatted price based on pip size
 ///
 /// This draws a rounded rectangle with the formatted value inside it.
