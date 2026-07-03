@@ -259,7 +259,17 @@ class RectangleInteractableDrawing
       return;
     }
 
-    // Draw value labels for both corners on the Y-axis.
+    // Draw value labels for both corners on the Y-axis. Equal displayed prices
+    // collapse to one label; near-equal ones don't overlap, moving only the
+    // dragged corner's box.
+    final ValueLabelPairLayout labelLayout = layoutValueLabelPair(
+      firstQuote: startPoint!.quote,
+      secondQuote: endPoint!.quote,
+      quoteToY: quoteToY,
+      pipSize: chartConfig.pipSize,
+      isDraggingFirst: isDraggingStartCorner,
+    );
+
     drawValueLabel(
       canvas: canvas,
       quoteToY: quoteToY,
@@ -270,9 +280,10 @@ class RectangleInteractableDrawing
       textStyle: config.labelStyle,
       color: config.lineStyle.color,
       backgroundColor: chartTheme.backgroundColor,
+      yPositionOverride: labelLayout.firstYOverride,
     );
 
-    if (endPoint!.quote != startPoint!.quote) {
+    if (labelLayout.showSecond) {
       drawValueLabel(
         canvas: canvas,
         quoteToY: quoteToY,
@@ -283,6 +294,7 @@ class RectangleInteractableDrawing
         textStyle: config.labelStyle,
         color: config.lineStyle.color,
         backgroundColor: chartTheme.backgroundColor,
+        yPositionOverride: labelLayout.secondYOverride,
       );
     }
 
