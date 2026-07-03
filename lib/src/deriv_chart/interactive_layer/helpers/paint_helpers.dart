@@ -241,6 +241,71 @@ ValueLabelPairLayout layoutValueLabelPair({
   );
 }
 
+/// Output of [layoutValueLabels]: a price and the Y its box should draw at.
+class PositionedValueLabel {
+  /// Creates a [PositionedValueLabel].
+  const PositionedValueLabel({required this.quote, required this.y});
+
+  /// The price the label shows.
+  final double quote;
+
+  /// The Y position to draw the box at (pass as [drawValueLabel]'s
+  /// `yPositionOverride`).
+  final double y;
+}
+
+/// Lays out several Y-axis price labels so their boxes don't overlap.
+///
+/// Labels whose prices format to the same displayed value (at [pipSize]) are
+/// merged into a single label. Remaining labels whose boxes would overlap are
+/// spread symmetrically until each vertically-adjacent pair is at least
+/// [minGap] apart. The layout depends only on the prices, so it is identical
+/// whether or not a drag is in progress.
+///
+/// Returns one entry per visible label; duplicates are dropped.
+List<PositionedValueLabel> layoutValueLabels(
+  List<double> quotes,
+  QuoteToY quoteToY,
+  int pipSize, {
+  double minGap = 24,
+}) {
+  // Merge quotes that format to the same displayed value.
+  final Map<String, double> byDisplay = <String, double>{};
+  for (final double quote in quotes) {
+    byDisplay.putIfAbsent(quote.toStringAsFixed(pipSize), () => quote);
+  }
+
+  final List<double> unique = byDisplay.values.toList();
+  final List<double> ys = unique.map(quoteToY).toList();
+
+  // Relax positions so vertically adjacent boxes stay [minGap] apart. A few
+  // passes converge for the handful of labels a drawing shows.
+  for (int iteration = 0; iteration < 8; iteration++) {
+    final List<int> order = List<int>.generate(unique.length, (int i) => i)
+      ..sort((int a, int b) => ys[a].compareTo(ys[b]));
+    bool changed = false;
+    for (int k = 0; k < order.length - 1; k++) {
+      final int i = order[k]; // Upper label (smaller y).
+      final int j = order[k + 1]; // Lower label (larger y).
+      final double overlap = minGap - (ys[j] - ys[i]);
+      if (overlap <= 0.01) {
+        continue;
+      }
+      ys[i] -= overlap / 2;
+      ys[j] += overlap / 2;
+      changed = true;
+    }
+    if (!changed) {
+      break;
+    }
+  }
+
+  return <PositionedValueLabel>[
+    for (int i = 0; i < unique.length; i++)
+      PositionedValueLabel(quote: unique[i], y: ys[i]),
+  ];
+}
+
 /// Draws a value rectangle with formatted price based on pip size
 ///
 /// This draws a rounded rectangle with the formatted value inside it.

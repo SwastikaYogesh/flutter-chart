@@ -371,26 +371,31 @@ class ChannelInteractableDrawing
     // `start + end - middle` (matching `topLeft = start + (end - middle)`).
     final double derivedCornerQuote =
         startPoint!.quote + endPoint!.quote - middlePoint!.quote;
-    final Set<double> seenQuotes = <double>{};
-    for (final double quote in <double>[
-      startPoint!.quote,
-      middlePoint!.quote,
-      endPoint!.quote,
-      derivedCornerQuote,
-    ]) {
-      if (seenQuotes.add(quote)) {
-        drawValueLabel(
-          canvas: canvas,
-          quoteToY: quoteToY,
-          value: quote,
-          pipSize: chartConfig.pipSize,
-          animationProgress: progress,
-          size: size,
-          textStyle: config.labelStyle,
-          color: config.lineStyle.color,
-          backgroundColor: chartTheme.backgroundColor,
-        );
-      }
+    // Lay the labels out: equal displayed prices collapse to one label and
+    // near-equal ones spread apart. Identical during a drag and at rest.
+    final List<PositionedValueLabel> labels = layoutValueLabels(
+      <double>[
+        startPoint!.quote, // bottom-left
+        middlePoint!.quote, // bottom-right
+        endPoint!.quote, // top-right
+        derivedCornerQuote, // top-left (derived)
+      ],
+      quoteToY,
+      chartConfig.pipSize,
+    );
+    for (final PositionedValueLabel label in labels) {
+      drawValueLabel(
+        canvas: canvas,
+        quoteToY: quoteToY,
+        value: label.quote,
+        pipSize: chartConfig.pipSize,
+        animationProgress: progress,
+        size: size,
+        textStyle: config.labelStyle,
+        color: config.lineStyle.color,
+        backgroundColor: chartTheme.backgroundColor,
+        yPositionOverride: label.y,
+      );
     }
 
     // Epoch labels (X-axis) for the three distinct point epochs.
