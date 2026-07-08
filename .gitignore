@@ -117,6 +117,3 @@ cline_instructions.md
 
 # Husky Git hooks
 .husky/
-
-# Generated Dart files
-*.g.dart
