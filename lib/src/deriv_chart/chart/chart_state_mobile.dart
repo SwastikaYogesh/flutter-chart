@@ -3,6 +3,10 @@ part of 'chart.dart';
 class _ChartStateMobile extends _ChartState {
   double _bottomSectionHeight = 0;
 
+  /// Whether the overlay indicator labels list is expanded. When collapsed,
+  /// only the toggle button is shown so the labels don't take up chart space.
+  bool _isOverlayLabelsExpanded = true;
+
   @override
   void initState() {
     super.initState();
@@ -247,9 +251,84 @@ class _ChartStateMobile extends _ChartState {
       }
     }
 
+    // Nothing to show if there are no overlay indicators.
+    if (overlayIndicatorsLabels.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: overlayIndicatorsLabels,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _buildOverlayLabelsCollapseButton(overlayIndicatorsLabels.length),
+        if (_isOverlayLabelsExpanded) ...<Widget>[
+          const SizedBox(height: Dimens.margin04),
+          ...overlayIndicatorsLabels,
+        ],
+      ],
     );
   }
+
+  /// A stadium "filter tag" pill showing the number of overlay indicators and a
+  /// caret to expand/collapse the labels list (matches the Figma design).
+  Widget _buildOverlayLabelsCollapseButton(int count) => Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_overlayPillRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: _chartTheme
+                  .crosshairInformationBoxContainerGlassBackgroundBlur,
+              sigmaY: _chartTheme
+                  .crosshairInformationBoxContainerGlassBackgroundBlur,
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(_overlayPillRadius),
+                onTap: () => setState(
+                  () => _isOverlayLabelsExpanded = !_isOverlayLabelsExpanded,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Dimens.margin08,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        _chartTheme.crosshairInformationBoxContainerGlassColor,
+                    borderRadius: BorderRadius.circular(_overlayPillRadius),
+                    border: Border.all(
+                      color: _chartTheme.base01Color.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        '$count',
+                        style: _chartTheme.textStyle(
+                          textStyle: TextStyles.caption2,
+                          color: _chartTheme.base01Color,
+                        ),
+                      ),
+                      const SizedBox(width: Dimens.margin04),
+                      Icon(
+                        _isOverlayLabelsExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 14,
+                        color: _chartTheme.base01Color,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  /// Fully-rounded (stadium) corner radius for the overlay labels toggle pill.
+  static const double _overlayPillRadius = 100;
 }
