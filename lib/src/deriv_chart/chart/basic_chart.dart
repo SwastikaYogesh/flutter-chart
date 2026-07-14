@@ -71,6 +71,8 @@ class BasicChartState<T extends BasicChart> extends State<T>
 
   bool _panStartedOnQuoteLabelsArea = false;
 
+  bool _panStartedOnChartArea = false;
+
   /// The canvas size to draw the chart series and other options inside.
   Size? canvasSize;
 
@@ -574,12 +576,20 @@ class BasicChartState<T extends BasicChart> extends State<T>
 
   void _onPanStart(ScaleStartDetails details) {
     _panStartedOnQuoteLabelsArea = _onQuoteLabelsTouchArea(details.focalPoint);
+    _panStartedOnChartArea =
+        !_panStartedOnQuoteLabelsArea && _onChartArea(details.focalPoint);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (_panStartedOnQuoteLabelsArea &&
         _onQuoteLabelsTouchArea(details.globalPosition)) {
       _scaleVertically(details.delta.dy);
+    } else if (_panStartedOnChartArea &&
+        details.delta.dy.abs() > details.delta.dx.abs()) {
+      // Vertical-dominant drag on the candles pans the price range up/down.
+      // Horizontal-dominant drags are left to the X-axis for time scrolling,
+      // so ordinary scrolling doesn't disturb the price scale.
+      _panVertically(details.delta.dy);
     }
   }
 
@@ -598,6 +608,41 @@ class BasicChartState<T extends BasicChart> extends State<T>
       position.dx > (xAxis.width! - quoteLabelsTouchAreaWidth) &&
       position.dy > chartPosition!.dy &&
       position.dy < chartPosition!.dy + canvasSize!.height;
+
+  bool _onChartArea(Offset position) =>
+      chartPosition != null &&
+      canvasSize != null &&
+      position.dx < (xAxis.width! - quoteLabelsTouchAreaWidth) &&
+      position.dy > chartPosition!.dy &&
+      position.dy < chartPosition!.dy + canvasSize!.height;
+
+  /// Pans the visible price range vertically by [dy] pixels so the candles
+  /// follow the drag, and takes the Y-axis out of autofit (TradingView style).
+  void _panVertically(double dy) {
+    if (canvasSize == null) {
+      return;
+    }
+    final double drawingRange =
+        canvasSize!.height - _topPadding - _bottomPadding;
+    if (drawingRange <= 0) {
+      return;
+    }
+
+    // Convert the pixel drag into a price shift. Dragging down (dy > 0) moves
+    // the price window up so the candles move down with the finger.
+    final double quoteRange = topBoundQuoteTarget - bottomBoundQuoteTarget;
+    final double delta = dy * quoteRange / drawingRange;
+
+    setState(() {
+      _autofitEnabled = false;
+      topBoundQuoteTarget += delta;
+      bottomBoundQuoteTarget += delta;
+      // Apply immediately (no animation) so the pan tracks the drag.
+      topBoundQuoteAnimationController.value = topBoundQuoteTarget;
+      bottomBoundQuoteAnimationController.value = bottomBoundQuoteTarget;
+    });
+    _onScaleYAxis();
+  }
 
   /// Smallest allowed visible price range while zooming, to keep coordinate
   /// math finite. There is no upper limit, so the user can zoom out freely.
