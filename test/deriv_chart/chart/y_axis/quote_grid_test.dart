@@ -7,8 +7,8 @@ void main() {
       final YAxisModel yAxisModel = YAxisModel(
           topBoundQuote: 10,
           bottomBoundQuote: 8,
-          yTopBound: 180,
-          yBottomBound: 60,
+          yTopBound: 60,
+          yBottomBound: 180,
           canvasHeight: 100,
           topPadding: 0,
           bottomPadding: 10);
@@ -21,11 +21,11 @@ void main() {
       final YAxisModel yAxisModel = YAxisModel(
           topBoundQuote: 10,
           bottomBoundQuote: 8,
-          yTopBound: 180,
-          yBottomBound: 60,
+          yTopBound: 60,
+          yBottomBound: 180,
           canvasHeight: 100,
           topPadding: 0,
-          bottomPadding: 10);
+          bottomPadding: 0);
       expect(
         yAxisModel.gridQuotes(),
         isNot(contains(8)),

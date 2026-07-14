@@ -179,6 +179,10 @@ class _ChartImplementationState extends BasicChartState<MainChart> {
   late final InteractiveLayerBehaviour _interactiveLayerBehaviour;
 
   @override
+  double get defaultVerticalPaddingFraction =>
+      widget.verticalPaddingFraction ?? super.defaultVerticalPaddingFraction;
+
+  @override
   double get verticalPadding {
     if (canvasSize == null) {
       return 0;
@@ -451,6 +455,16 @@ class _ChartImplementationState extends BasicChartState<MainChart> {
                     left: 0,
                     child: _buildDataFitButton(),
                   ),
+                if (context
+                        .watch<ChartConfig>()
+                        .chartAxisConfig
+                        .showAutoScaleButton &&
+                    (widget._mainSeries.entries?.isNotEmpty ?? false))
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: _buildAutoScaleButton(),
+                  ),
               ],
             ),
           );
@@ -616,6 +630,43 @@ class _ChartImplementationState extends BasicChartState<MainChart> {
           );
         },
       );
+
+  /// TradingView-style "auto scale" toggle shown on the price axis.
+  ///
+  /// A compact "A" toggle: when selected (autofit on) the letter sits on a
+  /// black background; when off it is shown without a background. Lets the user
+  /// enable/disable auto-fitting the Y-axis to the visible price range.
+  Widget _buildAutoScaleButton() {
+    final ChartTheme theme = context.watch<ChartTheme>();
+    final bool enabled = isAutofitEnabled;
+    return Padding(
+      padding: const EdgeInsets.all(4),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(4),
+          onTap: () => setAutofitEnabled(enabled: !enabled),
+          child: Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: enabled ? Colors.black : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              'A',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: enabled ? Colors.white : theme.base01Color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildDataFitButton() {
     final XAxisModel xAxis = context.read<XAxisModel>();
