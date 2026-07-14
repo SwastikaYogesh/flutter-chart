@@ -71,6 +71,8 @@ class BasicChartState<T extends BasicChart> extends State<T>
 
   bool _panStartedOnQuoteLabelsArea = false;
 
+  bool _panStartedOnChartArea = false;
+
   /// The canvas size to draw the chart series and other options inside.
   Size? canvasSize;
 
@@ -94,6 +96,40 @@ class BasicChartState<T extends BasicChart> extends State<T>
 
   /// Bottom quote bound target for animated transition.
   double bottomBoundQuoteTarget = 30;
+
+  /// Whether the Y-axis is currently auto-fitting its bounds to the visible
+  /// price range.
+  ///
+  /// Initialized from [ChartAxisConfig.autofit] and disabled internally once
+  /// the user manually scales the Y-axis. While `false`,
+  /// [_updateQuoteBoundTargets] leaves the price range untouched.
+  late bool _autofitEnabled;
+
+  /// Whether the Y-axis is currently auto-fitting to the visible price range.
+  bool get isAutofitEnabled => _autofitEnabled;
+
+  /// The vertical padding fraction restored when auto-fit is (re)enabled.
+  ///
+  /// Subclasses override this to honor a user-provided padding fraction.
+  double get defaultVerticalPaddingFraction => 0.1;
+
+  /// Enables or disables Y-axis autofit at runtime and repaints.
+  ///
+  /// Used by the price-axis "auto scale" toggle so the user can turn TradingView
+  /// style auto-fitting on or off. Re-enabling it restores the default vertical
+  /// padding so the visible candles fit the viewport again after a manual
+  /// Y-scale.
+  void setAutofitEnabled({required bool enabled}) {
+    if (_autofitEnabled == enabled) {
+      return;
+    }
+    setState(() {
+      _autofitEnabled = enabled;
+      if (enabled) {
+        verticalPaddingFraction = defaultVerticalPaddingFraction;
+      }
+    });
+  }
 
   /// Calculated quotes for showing the the grid line.
   List<double>? gridLineQuotes;
@@ -143,6 +179,7 @@ class BasicChartState<T extends BasicChart> extends State<T>
   @override
   void initState() {
     super.initState();
+    _autofitEnabled = widget.chartAxisConfig.autofit;
     _setupInitialBounds();
     setupAnimations();
     _setupGestures();
@@ -167,6 +204,12 @@ class BasicChartState<T extends BasicChart> extends State<T>
   void didUpdateChartData(BasicChart oldChart) {
     if (widget.mainSeries.id == oldChart.mainSeries.id) {
       widget.mainSeries.didUpdate(oldChart.mainSeries);
+    }
+
+    // Toggling the master switch in the config re-syncs the internal state,
+    // which also acts as the "reset to autofit" path after a manual Y-scale.
+    if (widget.chartAxisConfig.autofit != oldChart.chartAxisConfig.autofit) {
+      _autofitEnabled = widget.chartAxisConfig.autofit;
     }
 
     if (widget.currentTickAnimationDuration.inMilliseconds !=
@@ -311,6 +354,12 @@ class BasicChartState<T extends BasicChart> extends State<T>
       <double>[widget.mainSeries.minValue, widget.mainSeries.maxValue];
 
   void _updateQuoteBoundTargets() {
+    // The price range is only auto-fitted while autofit is enabled. When the
+    // user is controlling the Y-axis manually, keep the current bounds.
+    if (!_autofitEnabled) {
+      return;
+    }
+
     final List<double> minMaxValues = getSeriesMinMaxValue();
     double minQuote = minMaxValues[0];
     double maxQuote = minMaxValues[1];
@@ -326,28 +375,38 @@ class BasicChartState<T extends BasicChart> extends State<T>
       return;
     }
 
+    // Center the visible range and expand it by [priceRangePaddingFactor] to
+    // leave headroom above and below the candles (TradingView-style autofit).
+    final double range = maxQuote - minQuote;
+    final double viewportCenterPrice = minQuote + range / 2;
+    final double viewportPriceRange =
+        range * widget.chartAxisConfig.priceRangePaddingFactor;
+
+    final double topPrice = viewportCenterPrice + viewportPriceRange / 2;
+    final double bottomPrice = viewportCenterPrice - viewportPriceRange / 2;
+
     // Snap bounds and skip tick animation when switching to a market with a
     // disjoint price range, to avoid a long vertical-line artifact.
     final bool rangeDisjoint =
-        maxQuote < bottomBoundQuoteTarget || minQuote > topBoundQuoteTarget;
+        topPrice < bottomBoundQuoteTarget || bottomPrice > topBoundQuoteTarget;
     if (rangeDisjoint) {
-      bottomBoundQuoteTarget = minQuote;
-      bottomBoundQuoteAnimationController.value = minQuote;
-      topBoundQuoteTarget = maxQuote;
-      topBoundQuoteAnimationController.value = maxQuote;
+      bottomBoundQuoteTarget = bottomPrice;
+      bottomBoundQuoteAnimationController.value = bottomPrice;
+      topBoundQuoteTarget = topPrice;
+      topBoundQuoteAnimationController.value = topPrice;
       completeCurrentTickAnimation();
       return;
     }
 
-    if (minQuote != bottomBoundQuoteTarget) {
-      bottomBoundQuoteTarget = minQuote;
+    if (bottomPrice != bottomBoundQuoteTarget) {
+      bottomBoundQuoteTarget = bottomPrice;
       bottomBoundQuoteAnimationController.animateTo(
         bottomBoundQuoteTarget,
         curve: Curves.easeOut,
       );
     }
-    if (maxQuote != topBoundQuoteTarget) {
-      topBoundQuoteTarget = maxQuote;
+    if (topPrice != topBoundQuoteTarget) {
+      topBoundQuoteTarget = topPrice;
       topBoundQuoteAnimationController.animateTo(
         topBoundQuoteTarget,
         curve: Curves.easeOut,
@@ -517,12 +576,20 @@ class BasicChartState<T extends BasicChart> extends State<T>
 
   void _onPanStart(ScaleStartDetails details) {
     _panStartedOnQuoteLabelsArea = _onQuoteLabelsTouchArea(details.focalPoint);
+    _panStartedOnChartArea =
+        !_panStartedOnQuoteLabelsArea && _onChartArea(details.focalPoint);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     if (_panStartedOnQuoteLabelsArea &&
         _onQuoteLabelsTouchArea(details.globalPosition)) {
       _scaleVertically(details.delta.dy);
+    } else if (_panStartedOnChartArea &&
+        details.delta.dy.abs() > details.delta.dx.abs()) {
+      // Vertical-dominant drag on the candles pans the price range up/down.
+      // Horizontal-dominant drags are left to the X-axis for time scrolling,
+      // so ordinary scrolling doesn't disturb the price scale.
+      _panVertically(details.delta.dy);
     }
   }
 
@@ -542,10 +609,71 @@ class BasicChartState<T extends BasicChart> extends State<T>
       position.dy > chartPosition!.dy &&
       position.dy < chartPosition!.dy + canvasSize!.height;
 
-  void _scaleVertically(double dy) {
+  bool _onChartArea(Offset position) =>
+      chartPosition != null &&
+      canvasSize != null &&
+      position.dx < (xAxis.width! - quoteLabelsTouchAreaWidth) &&
+      position.dy > chartPosition!.dy &&
+      position.dy < chartPosition!.dy + canvasSize!.height;
+
+  /// Pans the visible price range vertically by [dy] pixels so the candles
+  /// follow the drag, and takes the Y-axis out of autofit (TradingView style).
+  void _panVertically(double dy) {
+    if (canvasSize == null) {
+      return;
+    }
+    final double drawingRange =
+        canvasSize!.height - _topPadding - _bottomPadding;
+    if (drawingRange <= 0) {
+      return;
+    }
+
+    // Convert the pixel drag into a price shift. Dragging down (dy > 0) moves
+    // the price window up so the candles move down with the finger.
+    final double quoteRange = topBoundQuoteTarget - bottomBoundQuoteTarget;
+    final double delta = dy * quoteRange / drawingRange;
+
     setState(() {
-      verticalPaddingFraction =
-          ((verticalPadding + dy) / canvasSize!.height).clamp(0.05, 0.49);
+      _autofitEnabled = false;
+      topBoundQuoteTarget += delta;
+      bottomBoundQuoteTarget += delta;
+      // Apply immediately (no animation) so the pan tracks the drag.
+      topBoundQuoteAnimationController.value = topBoundQuoteTarget;
+      bottomBoundQuoteAnimationController.value = bottomBoundQuoteTarget;
+    });
+    _onScaleYAxis();
+  }
+
+  /// Smallest allowed visible price range while zooming, to keep coordinate
+  /// math finite. There is no upper limit, so the user can zoom out freely.
+  static const double _minQuoteRange = 1e-9;
+
+  void _scaleVertically(double dy) {
+    if (canvasSize == null || canvasSize!.height == 0) {
+      return;
+    }
+
+    // Scale the visible price range around its center. Dragging down (dy > 0)
+    // grows the range (zoom out); dragging up shrinks it (zoom in). The range
+    // is only floored (not capped), so the user can zoom in as far as they want.
+    final double center = (topBoundQuoteTarget + bottomBoundQuoteTarget) / 2;
+    double range = topBoundQuoteTarget - bottomBoundQuoteTarget;
+
+    final double scale = 1 + dy / canvasSize!.height;
+    range = (range * scale).abs();
+    if (range < _minQuoteRange) {
+      range = _minQuoteRange;
+    }
+
+    setState(() {
+      // Manually scaling the Y-axis takes it out of autofit mode until autofit
+      // is re-enabled via the "auto scale" toggle or [ChartAxisConfig.autofit].
+      _autofitEnabled = false;
+      topBoundQuoteTarget = center + range / 2;
+      bottomBoundQuoteTarget = center - range / 2;
+      // Apply immediately (no animation) so the zoom tracks the drag.
+      topBoundQuoteAnimationController.value = topBoundQuoteTarget;
+      bottomBoundQuoteAnimationController.value = bottomBoundQuoteTarget;
     });
     _onScaleYAxis();
   }

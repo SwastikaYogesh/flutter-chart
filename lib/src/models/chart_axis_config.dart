@@ -10,6 +10,10 @@ const double defaultBottomBoundQuote = 30;
 /// Limits panning to the right.
 const double defaultMaxCurrentTickOffset = 150;
 
+/// Default factor applied to the visible price range to add headroom above and
+/// below the candles when auto-fitting the Y-axis.
+const double defaultPriceRangePaddingFactor = 1.2;
+
 /// Configuration for the chart axis.
 @immutable
 class ChartAxisConfig {
@@ -24,6 +28,9 @@ class ChartAxisConfig {
     this.showEpochGrid = true,
     this.showFrame = false,
     this.smoothScrolling = true,
+    this.autofit = true,
+    this.priceRangePaddingFactor = defaultPriceRangePaddingFactor,
+    this.showAutoScaleButton = true,
   });
 
   /// Top quote bound target for animated transition.
@@ -72,12 +79,40 @@ class ChartAxisConfig {
   /// Default is `true`.
   final bool smoothScrolling;
 
+  /// Whether the Y-axis should automatically fit its bounds to the visible
+  /// price range.
+  ///
+  /// When `true` (default), the visible top/bottom price bounds are recomputed
+  /// from the highest and lowest visible quote on every update. When `false`,
+  /// the price range is left untouched so it can be controlled manually.
+  ///
+  /// This acts as the master switch: when the user manually scales the Y-axis,
+  /// auto-fitting is disabled internally until this is set back to `true`.
+  final bool autofit;
+
+  /// Factor applied to the visible price range (`maxQuote - minQuote`) to add
+  /// headroom above and below the candles while auto-fitting.
+  ///
+  /// A value of `1.2` leaves 10% extra space above and below the data. Only
+  /// used while [autofit] is enabled. Defaults to
+  /// [defaultPriceRangePaddingFactor].
+  final double priceRangePaddingFactor;
+
+  /// Whether to show the TradingView-style "auto scale" toggle button on the
+  /// price axis, letting the user enable/disable [autofit] at runtime.
+  ///
+  /// Defaults to `true`.
+  final bool showAutoScaleButton;
+
   /// Creates a copy of this ChartAxisConfig but with the given fields replaced.
   ChartAxisConfig copyWith({
     double? initialTopBoundQuote,
     double? initialBottomBoundQuote,
     double? maxCurrentTickOffset,
     double? defaultTickOffset,
+    bool? autofit,
+    double? priceRangePaddingFactor,
+    bool? showAutoScaleButton,
   }) =>
       ChartAxisConfig(
         initialTopBoundQuote: initialTopBoundQuote ?? this.initialTopBoundQuote,
@@ -85,5 +120,9 @@ class ChartAxisConfig {
             initialBottomBoundQuote ?? this.initialBottomBoundQuote,
         maxCurrentTickOffset: maxCurrentTickOffset ?? this.maxCurrentTickOffset,
         defaultTickOffset: defaultTickOffset ?? this.defaultTickOffset,
+        autofit: autofit ?? this.autofit,
+        priceRangePaddingFactor:
+            priceRangePaddingFactor ?? this.priceRangePaddingFactor,
+        showAutoScaleButton: showAutoScaleButton ?? this.showAutoScaleButton,
       );
 }
